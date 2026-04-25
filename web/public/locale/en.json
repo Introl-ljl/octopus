@@ -445,7 +445,10 @@
             "retryDetails": "Retry Details",
             "attempts": "attempts",
             "success": "Success",
-            "failed": "Failed"
+            "failed": "Failed",
+            "direct": "Direct",
+            "transparentProxy": "Transparent Proxy",
+            "protocolTransform": "Protocol Transform"
         }
     },
     "channel": {

@@ -35,8 +35,9 @@ type Channel struct {
 }
 
 type BaseUrl struct {
-	URL   string `json:"url"`
-	Delay int    `json:"delay"`
+	URL   string                 `json:"url"`
+	Delay int                    `json:"delay"`
+	Type  *outbound.OutboundType `json:"type,omitempty"`
 }
 
 type CustomHeader struct {
@@ -99,26 +100,61 @@ type ChannelFetchModelRequest struct {
 }
 
 func (c *Channel) GetBaseUrl() string {
+	baseURL, _ := c.GetBaseUrlByType(nil)
+	return baseURL
+}
+
+func (c *Channel) GetBaseUrlByType(preferredType *outbound.OutboundType) (string, outbound.OutboundType) {
 	if c == nil || len(c.BaseUrls) == 0 {
-		return ""
+		if c == nil {
+			return "", outbound.OutboundTypeOpenAIChat
+		}
+		return "", c.Type
 	}
 
-	bestURL := ""
-	bestDelay := 0
-	bestSet := false
+	selectBest := func(targetType *outbound.OutboundType) (string, outbound.OutboundType, bool) {
+		bestURL := ""
+		bestDelay := 0
+		bestType := c.Type
+		bestSet := false
 
-	for _, bu := range c.BaseUrls {
-		if bu.URL == "" {
-			continue
+		for _, bu := range c.BaseUrls {
+			if bu.URL == "" {
+				continue
+			}
+			resolvedType := c.Type
+			if bu.Type != nil {
+				resolvedType = *bu.Type
+			}
+			if targetType != nil && resolvedType != *targetType {
+				continue
+			}
+			if !bestSet || bu.Delay < bestDelay {
+				bestURL = bu.URL
+				bestDelay = bu.Delay
+				bestType = resolvedType
+				bestSet = true
+			}
 		}
-		if !bestSet || bu.Delay < bestDelay {
-			bestURL = bu.URL
-			bestDelay = bu.Delay
-			bestSet = true
+
+		return bestURL, bestType, bestSet
+	}
+
+	if preferredType != nil {
+		if bestURL, bestType, ok := selectBest(preferredType); ok {
+			return bestURL, bestType
 		}
 	}
 
-	return bestURL
+	if bestURL, bestType, ok := selectBest(&c.Type); ok {
+		return bestURL, bestType
+	}
+
+	if bestURL, bestType, ok := selectBest(nil); ok {
+		return bestURL, bestType
+	}
+
+	return "", c.Type
 }
 
 func (c *Channel) GetChannelKey() ChannelKey {

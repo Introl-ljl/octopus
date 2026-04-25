@@ -58,3 +58,24 @@ func Get(outboundType OutboundType) model.Outbound {
 	}
 	return nil
 }
+
+// OutboundTypeToFormat 将 OutboundType 转换为 Format 字符串。
+func OutboundTypeToFormat(t OutboundType) string {
+	switch t {
+	case OutboundTypeOpenAIChat:
+		return "openai"
+	case OutboundTypeOpenAIResponse:
+		return "openai-response"
+	case OutboundTypeOpenAIEmbedding:
+		return "openai-embedding"
+	case OutboundTypeAnthropic:
+		return "anthropic"
+	case OutboundTypeGemini:
+		return "gemini"
+	case OutboundTypeVolcengine:
+		return "volcengine"
+	default:
+		return ""
+	}
+}
+

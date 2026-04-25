@@ -445,7 +445,10 @@
             "retryDetails": "重試詳情",
             "attempts": "次嘗試",
             "success": "成功",
-            "failed": "失敗"
+            "failed": "失敗",
+            "direct": "直連",
+            "transparentProxy": "直連透傳",
+            "protocolTransform": "協議轉換"
         }
     },
     "channel": {

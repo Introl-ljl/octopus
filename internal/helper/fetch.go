@@ -16,36 +16,82 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	fetchModel := make([]string, 0)
-	switch request.Type {
-	case outbound.OutboundTypeAnthropic:
-		fetchModel, err = fetchAnthropicModels(client, ctx, request)
-	case outbound.OutboundTypeGemini:
-		fetchModel, err = fetchGeminiModels(client, ctx, request)
-	default:
-		fetchModel, err = fetchOpenAIModels(client, ctx, request)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if request.MatchRegex != nil && *request.MatchRegex != "" {
-		matchModel := make([]string, 0)
-		re, err := regexp2.Compile(*request.MatchRegex, regexp2.ECMAScript)
-		if err != nil {
-			return nil, err
+	fetchModelsByType := func(req model.Channel, resolvedType outbound.OutboundType) ([]string, error) {
+		switch resolvedType {
+		case outbound.OutboundTypeAnthropic:
+			return fetchAnthropicModels(client, ctx, req)
+		case outbound.OutboundTypeGemini:
+			return fetchGeminiModels(client, ctx, req)
+		default:
+			return fetchOpenAIModels(client, ctx, req)
 		}
-		for _, model := range fetchModel {
-			matched, err := re.MatchString(model)
+	}
+
+	applyMatchRegex := func(models []string) ([]string, error) {
+		if request.MatchRegex != nil && *request.MatchRegex != "" {
+			matchModel := make([]string, 0)
+			re, err := regexp2.Compile(*request.MatchRegex, regexp2.ECMAScript)
 			if err != nil {
 				return nil, err
 			}
-			if matched {
-				matchModel = append(matchModel, model)
+			for _, model := range models {
+				matched, err := re.MatchString(model)
+				if err != nil {
+					return nil, err
+				}
+				if matched {
+					matchModel = append(matchModel, model)
+				}
 			}
+			return matchModel, nil
 		}
-		return matchModel, nil
+		return models, nil
 	}
-	return fetchModel, nil
+
+	if len(request.BaseUrls) == 0 {
+		_, resolvedType := request.GetBaseUrlByType(nil)
+		fetchModel, err := fetchModelsByType(request, resolvedType)
+		if err != nil {
+			return nil, err
+		}
+		return applyMatchRegex(fetchModel)
+	}
+
+	mergedModels := make([]string, 0)
+	seen := make(map[string]struct{}, len(request.BaseUrls))
+	var lastErr error
+
+	for _, baseURL := range request.BaseUrls {
+		if strings.TrimSpace(baseURL.URL) == "" {
+			continue
+		}
+		resolvedType := request.Type
+		if baseURL.Type != nil {
+			resolvedType = *baseURL.Type
+		}
+		childRequest := request
+		childRequest.Type = resolvedType
+		childRequest.BaseUrls = []model.BaseUrl{baseURL}
+
+		fetchModel, err := fetchModelsByType(childRequest, resolvedType)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		for _, name := range fetchModel {
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			mergedModels = append(mergedModels, name)
+		}
+	}
+
+	if len(mergedModels) == 0 && lastErr != nil {
+		return nil, lastErr
+	}
+
+	return applyMatchRegex(mergedModels)
 }
 
 // refer: https://platform.openai.com/docs/api-reference/models/list

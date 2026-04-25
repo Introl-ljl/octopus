@@ -32,6 +32,8 @@ export interface RelayLog {
     time: number;                // 时间戳
     request_model_name: string;  // 请求模型名称
     request_api_key_name?: string; // 请求使用的 API Key 名称
+    inbound_format?: string;     // 入站协议格式
+    outbound_format?: string;    // 出站协议格式
     channel: number;             // 实际使用的渠道ID
     channel_name: string;        // 渠道名称
     actual_model_name: string;   // 实际使用模型名称
@@ -45,6 +47,7 @@ export interface RelayLog {
     error: string;               // 错误信息
     attempts?: ChannelAttempt[]; // 所有尝试记录
     total_attempts?: number;     // 总尝试次数
+    is_direct?: boolean;         // 是否透明代理直连
 }
 
 /**

@@ -1,10 +1,12 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -14,18 +16,49 @@ import (
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/relay/balancer"
 	"github.com/bestruirui/octopus/internal/server/resp"
-	"github.com/bestruirui/octopus/internal/transformer/inbound"
+	"github.com/bestruirui/octopus/internal/transformer"
 	"github.com/bestruirui/octopus/internal/transformer/model"
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"github.com/tmaxmax/go-sse"
 )
 
+func preferredOutboundTypeForFormat(inFormat transformer.Format) *outbound.OutboundType {
+	switch inFormat {
+	case transformer.FormatOpenAIChat:
+		t := outbound.OutboundTypeOpenAIChat
+		return &t
+	case transformer.FormatOpenAIResponse:
+		t := outbound.OutboundTypeOpenAIResponse
+		return &t
+	case transformer.FormatOpenAIEmbedding:
+		t := outbound.OutboundTypeOpenAIEmbedding
+		return &t
+	case transformer.FormatAnthropic:
+		t := outbound.OutboundTypeAnthropic
+		return &t
+	default:
+		return nil
+	}
+}
+
+func (ra *relayAttempt) resolvedBaseURL() string {
+	if strings.TrimSpace(ra.selectedBaseURL) != "" {
+		return ra.selectedBaseURL
+	}
+	if ra.channel == nil {
+		return ""
+	}
+	return ra.channel.GetBaseUrl()
+}
+
 // Handler 处理入站请求并转发到上游服务
-func Handler(inboundType inbound.InboundType, c *gin.Context) {
+func Handler(inFormat transformer.Format, c *gin.Context) {
 	// 解析请求
-	internalRequest, inAdapter, err := parseRequest(inboundType, c)
+	internalRequest, rawBody, inAdapter, err := parseRequest(inFormat, c)
 	if err != nil {
 		return
 	}
@@ -56,11 +89,13 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 	}
 
 	// 初始化 Metrics
-	metrics := NewRelayMetrics(apiKeyID, requestModel, internalRequest)
+	metrics := NewRelayMetrics(apiKeyID, requestModel, string(inFormat), internalRequest)
 
 	// 请求级上下文
 	req := &relayRequest{
 		c:               c,
+		inFormat:        inFormat,
+		rawBody:         rawBody,
 		inAdapter:       inAdapter,
 		internalRequest: internalRequest,
 		metrics:         metrics,
@@ -106,19 +141,25 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			continue
 		}
 
+		selectedBaseURL, selectedType := channel.GetBaseUrlByType(preferredOutboundTypeForFormat(inFormat))
+		if selectedBaseURL == "" {
+			iter.Skip(channel.ID, usedKey.ID, channel.Name, "no available base url")
+			continue
+		}
+
 		// 出站适配器
-		outAdapter := outbound.Get(channel.Type)
+		outAdapter := outbound.Get(selectedType)
 		if outAdapter == nil {
-			iter.Skip(channel.ID, usedKey.ID, channel.Name, fmt.Sprintf("unsupported channel type: %d", channel.Type))
+			iter.Skip(channel.ID, usedKey.ID, channel.Name, fmt.Sprintf("unsupported channel type: %d", selectedType))
 			continue
 		}
 
 		// 类型兼容性检查
-		if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(channel.Type) {
+		if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(selectedType) {
 			iter.Skip(channel.ID, usedKey.ID, channel.Name, "channel type not compatible with embedding request")
 			continue
 		}
-		if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(channel.Type) {
+		if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(selectedType) {
 			iter.Skip(channel.ID, usedKey.ID, channel.Name, "channel type not compatible with chat request")
 			continue
 		}
@@ -130,11 +171,18 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			requestModel, group.Mode, channel.Name, item.ModelName,
 			iter.Index()+1, iter.Len(), iter.IsSticky())
 
-		// 构造尝试级上下文 -- 只写变化的 4 个字段
+		// 出站格式
+		outFormat := transformer.Format(outbound.OutboundTypeToFormat(selectedType))
+		metrics.OutboundFormat = string(outFormat)
+
+		// 构造尝试级上下文 -- 只写变化的字段
 		ra := &relayAttempt{
 			relayRequest:         req,
+			outFormat:            outFormat,
 			outAdapter:           outAdapter,
 			channel:              channel,
+			selectedBaseURL:      selectedBaseURL,
+			selectedType:         selectedType,
 			usedKey:              usedKey,
 			firstTokenTimeOutSec: group.FirstTokenTimeOut,
 		}
@@ -214,18 +262,23 @@ func (ra *relayAttempt) attempt() attemptResult {
 }
 
 // parseRequest 解析并验证入站请求
-func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.InternalLLMRequest, model.Inbound, error) {
+func parseRequest(inFormat transformer.Format, c *gin.Context) (*model.InternalLLMRequest, []byte, model.Inbound, error) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	inAdapter := inbound.Get(inboundType)
+	inAdapter := transformer.Default().GetInbound(inFormat)
+	if inAdapter == nil {
+		resp.Error(c, http.StatusInternalServerError, "unsupported inbound format")
+		return nil, nil, nil, fmt.Errorf("unsupported inbound format: %s", inFormat)
+	}
+
 	internalRequest, err := inAdapter.TransformRequest(c.Request.Context(), body)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Pass through the original query parameters
@@ -233,21 +286,30 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 
 	if err := internalRequest.Validate(); err != nil {
 		resp.Error(c, http.StatusBadRequest, err.Error())
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return internalRequest, inAdapter, nil
+	return internalRequest, body, inAdapter, nil
 }
 
 // forward 转发请求到上游服务
 func (ra *relayAttempt) forward() (int, error) {
 	ctx := ra.c.Request.Context()
 
+	// 判断是否可以走透明代理
+	if !transformer.Default().NeedTransform(ra.inFormat, ra.outFormat) {
+		log.Infof("transparent proxy: %s -> %s", ra.inFormat, ra.outFormat)
+		ra.metrics.IsDirect = true
+		return ra.forwardTransparent(ctx)
+	}
+
+	// ==================== 原有转换逻辑 ====================
+
 	// 构建出站请求
 	outboundRequest, err := ra.outAdapter.TransformRequest(
 		ctx,
 		ra.internalRequest,
-		ra.channel.GetBaseUrl(),
+		ra.resolvedBaseURL(),
 		ra.usedKey.ChannelKey,
 	)
 	if err != nil {
@@ -455,4 +517,270 @@ func (ra *relayAttempt) collectResponse() {
 	}
 
 	ra.metrics.SetInternalResponse(internalResponse, ra.internalRequest.Model)
+}
+
+// ============================== 透明代理核心逻辑 ==============================
+
+// forwardTransparent 执行透明代理，跳过所有的内部模型转换，直接转发原始 JSON 请求和响应
+func (ra *relayAttempt) forwardTransparent(ctx context.Context) (int, error) {
+	// 1. 对透明请求做最小必要改写：替换 model，并为 OpenAI chat stream 保留 usage 统计。
+	newBody, err := ra.prepareTransparentBody()
+	if err != nil {
+		return 0, err
+	}
+
+	// 2. 构造 HTTP 请求
+	requestURL, err := ra.buildTransparentRequestURL()
+	if err != nil {
+		return 0, err
+	}
+
+	outboundRequest, err := http.NewRequestWithContext(ctx, ra.c.Request.Method, requestURL, bytes.NewReader(newBody))
+	if err != nil {
+		return 0, fmt.Errorf("failed to create transparent request: %w", err)
+	}
+
+	// 设置认证头 (兼容多种协议)
+	if ra.outFormat == transformer.FormatAnthropic {
+		outboundRequest.Header.Set("x-api-key", ra.usedKey.ChannelKey)
+		outboundRequest.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		outboundRequest.Header.Set("Authorization", "Bearer "+ra.usedKey.ChannelKey)
+	}
+	outboundRequest.Header.Set("Content-Type", "application/json")
+
+	ra.copyHeaders(outboundRequest)
+
+	// 3. 发送请求
+	response, err := ra.sendRequest(outboundRequest)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send transparent request: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		body, _ := io.ReadAll(response.Body)
+		return 0, fmt.Errorf("upstream error: %d: %s", response.StatusCode, string(body))
+	}
+
+	// 4. 处理响应（透明透传）
+	isStream := ra.internalRequest.Stream != nil && *ra.internalRequest.Stream
+	if isStream {
+		if err := ra.handleTransparentStreamResponse(ctx, response); err != nil {
+			return 0, err
+		}
+	} else {
+		if err := ra.handleTransparentResponse(ctx, response); err != nil {
+			return 0, err
+		}
+	}
+
+	return response.StatusCode, nil
+}
+
+func (ra *relayAttempt) prepareTransparentBody() ([]byte, error) {
+	newBody := ra.rawBody
+	if gjson.GetBytes(newBody, "model").Exists() {
+		var err error
+		newBody, err = sjson.SetBytes(newBody, "model", ra.internalRequest.Model)
+		if err != nil {
+			log.Warnf("failed to set model in transparent proxy: %v", err)
+			return nil, fmt.Errorf("failed to prepare transparent request: %w", err)
+		}
+	}
+
+	if !ra.shouldInjectTransparentUsage() {
+		return newBody, nil
+	}
+
+	newBody, err := sjson.SetBytes(newBody, "stream_options.include_usage", true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare transparent request: %w", err)
+	}
+
+	return newBody, nil
+}
+
+func (ra *relayAttempt) shouldInjectTransparentUsage() bool {
+	return ra.outFormat == transformer.FormatOpenAIChat &&
+		ra.internalRequest.Stream != nil && *ra.internalRequest.Stream
+}
+
+func (ra *relayAttempt) buildTransparentRequestURL() (string, error) {
+	baseURL, err := url.Parse(strings.TrimSuffix(ra.resolvedBaseURL(), "/"))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse transparent base url: %w", err)
+	}
+
+	basePath := strings.TrimSuffix(baseURL.Path, "/")
+	requestPath := ra.transparentUpstreamPath(basePath)
+	switch {
+	case basePath == "":
+		baseURL.Path = requestPath
+	case requestPath == "":
+		baseURL.Path = basePath
+	default:
+		baseURL.Path = basePath + "/" + strings.TrimPrefix(requestPath, "/")
+	}
+	baseURL.RawQuery = ra.c.Request.URL.RawQuery
+
+	return baseURL.String(), nil
+}
+
+func (ra *relayAttempt) transparentUpstreamPath(basePath string) string {
+	requestPath := ra.c.Request.URL.Path
+	if requestPath == "" {
+		return ""
+	}
+	if basePath == "/v1" || strings.HasSuffix(basePath, "/v1") {
+		if requestPath == "/v1" {
+			return ""
+		}
+		if strings.HasPrefix(requestPath, "/v1/") {
+			return strings.TrimPrefix(requestPath, "/v1")
+		}
+	}
+	return requestPath
+}
+
+// handleTransparentResponse 直接透传非流式响应
+func (ra *relayAttempt) handleTransparentResponse(ctx context.Context, response *http.Response) error {
+	for k, v := range response.Header {
+		if hopByHopHeaders[strings.ToLower(k)] {
+			continue
+		}
+		for _, vv := range v {
+			ra.c.Header(k, vv)
+		}
+	}
+	ra.c.Status(response.StatusCode)
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	_, err = ra.c.Writer.Write(body)
+
+	// 为了统计计费，我们需要将原始响应转码一遍，这是必要的开销
+	// 如果需要极致性能，可以考虑直接解析 json 提取 usage
+	if internalResp, parseErr := ra.outAdapter.TransformResponse(ctx, &http.Response{
+		StatusCode: response.StatusCode,
+		Body:       io.NopCloser(bytes.NewReader(body)),
+		Header:     response.Header,
+	}); parseErr == nil {
+		ra.metrics.SetInternalResponse(internalResp, ra.internalRequest.Model)
+	}
+
+	return err
+}
+
+// handleTransparentStreamResponse 直接透传流式响应（SSE）
+func (ra *relayAttempt) handleTransparentStreamResponse(ctx context.Context, response *http.Response) error {
+	ra.c.Header("Content-Type", "text/event-stream")
+	ra.c.Header("Cache-Control", "no-cache")
+	ra.c.Header("Connection", "keep-alive")
+	ra.c.Header("X-Accel-Buffering", "no")
+
+	for k, v := range response.Header {
+		if hopByHopHeaders[strings.ToLower(k)] || strings.ToLower(k) == "content-type" || strings.ToLower(k) == "content-length" {
+			continue
+		}
+		for _, vv := range v {
+			ra.c.Header(k, vv)
+		}
+	}
+
+	firstToken := true
+	var firstTokenTimer *time.Timer
+	var firstTokenC <-chan time.Time
+
+	if ra.firstTokenTimeOutSec > 0 {
+		firstTokenTimer = time.NewTimer(time.Duration(ra.firstTokenTimeOutSec) * time.Second)
+		firstTokenC = firstTokenTimer.C
+		defer func() {
+			if firstTokenTimer != nil {
+				firstTokenTimer.Stop()
+			}
+		}()
+	}
+
+	type transparentSSEReadResult struct {
+		event sse.Event
+		err   error
+	}
+	results := make(chan transparentSSEReadResult, 1)
+
+	go func() {
+		defer close(results)
+		readCfg := &sse.ReadConfig{MaxEventSize: maxSSEEventSize}
+		for ev, err := range sse.Read(response.Body, readCfg) {
+			if err != nil {
+				results <- transparentSSEReadResult{err: err}
+				return
+			}
+			results <- transparentSSEReadResult{event: ev}
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-firstTokenC:
+			return fmt.Errorf("first token timeout (%ds)", ra.firstTokenTimeOutSec)
+		case r, ok := <-results:
+			if !ok {
+				return nil
+			}
+			if r.err != nil {
+				return fmt.Errorf("failed to read stream event: %w", r.err)
+			}
+
+			if firstToken {
+				ra.metrics.SetFirstTokenTime(time.Now())
+				firstToken = false
+				if firstTokenTimer != nil {
+					firstTokenTimer.Stop()
+					firstTokenTimer = nil
+					firstTokenC = nil
+				}
+			}
+
+			if err := writeTransparentSSEMessage(ra.c.Writer, r.event); err != nil {
+				return fmt.Errorf("failed to write stream event: %w", err)
+			}
+			ra.c.Writer.Flush()
+
+			// 后台异步进行流式解析统计 usage
+			if internalStream, err := ra.outAdapter.TransformStream(ctx, []byte(r.event.Data)); err == nil && internalStream != nil {
+				// 获取 inbound 实例保存状态，以便请求结束时 collectResponse 获取最终结果
+				ra.inAdapter.TransformStream(ctx, internalStream)
+			}
+		}
+	}
+}
+
+func writeTransparentSSEMessage(w io.Writer, ev sse.Event) error {
+	if ev.Type != "" {
+		if strings.ContainsAny(ev.Type, "\r\n") {
+			return fmt.Errorf("invalid sse event type")
+		}
+		if _, err := io.WriteString(w, "event: "+ev.Type+"\n"); err != nil {
+			return err
+		}
+	}
+
+	if ev.Data != "" {
+		data := strings.ReplaceAll(ev.Data, "\r\n", "\n")
+		data = strings.ReplaceAll(data, "\r", "\n")
+		for _, line := range strings.Split(data, "\n") {
+			if _, err := io.WriteString(w, "data: "+line+"\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	_, err := io.WriteString(w, "\n")
+	return err
 }

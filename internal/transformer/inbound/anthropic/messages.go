@@ -47,12 +47,11 @@ func (i *MessagesInbound) TransformRequest(ctx context.Context, body []byte) (*m
 		Temperature:         anthropicReq.Temperature,
 		TopP:                anthropicReq.TopP,
 		Stream:              anthropicReq.Stream,
-		Metadata:            map[string]string{},
 		RawAPIFormat:        model.APIFormatAnthropicMessage,
 		TransformerMetadata: map[string]string{},
 	}
-	if anthropicReq.Metadata != nil {
-		chatReq.Metadata["user_id"] = anthropicReq.Metadata.UserID
+	if anthropicReq.Metadata != nil && anthropicReq.Metadata.UserID != "" {
+		chatReq.User = lo.ToPtr(anthropicReq.Metadata.UserID)
 	}
 
 	// Convert messages

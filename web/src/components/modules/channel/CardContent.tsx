@@ -26,6 +26,16 @@ import { ChannelForm, type ChannelFormData } from './Form';
 import { formatMoney } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ChannelType } from '@/api/endpoints/channel';
+
+const channelTypeLabelMap: Record<ChannelType, string> = {
+    [ChannelType.OpenAIChat]: 'OpenAI Chat',
+    [ChannelType.OpenAIResponse]: 'OpenAI Responses',
+    [ChannelType.Anthropic]: 'Anthropic',
+    [ChannelType.Gemini]: 'Gemini',
+    [ChannelType.Volcengine]: 'Volcengine',
+    [ChannelType.OpenAIEmbedding]: 'OpenAI Embedding',
+};
 
 export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
     const { setIsOpen } = useMorphingDialog();
@@ -37,7 +47,9 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         name: channel.name,
         type: channel.type,
         enabled: channel.enabled,
-        base_urls: channel.base_urls?.length ? channel.base_urls : [{ url: '', delay: 0 }],
+        base_urls: channel.base_urls?.length
+            ? channel.base_urls.map((item) => ({ ...item, type: item.type ?? channel.type }))
+            : [{ url: '', delay: 0, type: channel.type }],
         custom_header: channel.custom_header ?? [],
         channel_proxy: channel.channel_proxy ?? '',
         param_override: channel.param_override ?? '',
@@ -80,6 +92,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             req.base_urls = (formData.base_urls ?? []).filter((u) => u.url.trim()).map((u) => ({
                 url: u.url.trim(),
                 delay: Number(u.delay || 0),
+                type: u.type ?? formData.type,
             }));
         }
         if (formData.model !== channel.model) req.model = formData.model;
@@ -324,6 +337,9 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             <div key={i} className="flex items-center justify-between p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
                                                 <div className="flex flex-col gap-1 min-w-0">
                                                     <span className="font-mono text-sm truncate select-all">{url.url}</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {channelTypeLabelMap[(url.type ?? channel.type) as ChannelType]}
+                                                    </span>
                                                 </div>
                                                 <Badge
                                                     variant="secondary"

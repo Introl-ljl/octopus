@@ -293,7 +293,10 @@ func convertToAnthropicRequest(req *model.InternalLLMRequest) *anthropicModel.Me
 		System:      convertSystemPrompt(req),
 	}
 
-	if req.Metadata != nil && req.Metadata["user_id"] != "" {
+	switch {
+	case req.User != nil && *req.User != "":
+		result.Metadata = &anthropicModel.AnthropicMetadata{UserID: *req.User}
+	case req.Metadata != nil && req.Metadata["user_id"] != "":
 		result.Metadata = &anthropicModel.AnthropicMetadata{UserID: req.Metadata["user_id"]}
 	}
 

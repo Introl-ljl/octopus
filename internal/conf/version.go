@@ -1,7 +1,7 @@
 package conf
 
 var (
-	Version   = "dev"
+	Version   = "Introl-0.1.0"
 	Commit    = "unknown"
 	BuildTime = "unknown"
 	Author    = "bestrui"

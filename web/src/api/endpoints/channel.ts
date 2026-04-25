@@ -28,6 +28,7 @@ export enum AutoGroupType {
 export type BaseUrl = {
     url: string;
     delay: number;
+    type?: ChannelType | null;
 };
 
 export type CustomHeader = {

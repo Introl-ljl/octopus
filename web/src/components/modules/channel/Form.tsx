@@ -78,7 +78,7 @@ export function ChannelForm({
     // This avoids "empty list" UI and also keeps URL + APIKEY layout consistent.
     useEffect(() => {
         if (!formData.base_urls || formData.base_urls.length === 0) {
-            onFormDataChange({ ...formData, base_urls: [{ url: '', delay: 0 }] });
+            onFormDataChange({ ...formData, base_urls: [{ url: '', delay: 0, type: formData.type }] });
             return;
         }
         if (!formData.keys || formData.keys.length === 0) {
@@ -188,7 +188,7 @@ export function ChannelForm({
     const handleAddBaseUrl = () => {
         onFormDataChange({
             ...formData,
-            base_urls: [...(formData.base_urls ?? []), { url: '', delay: 0 }],
+            base_urls: [...(formData.base_urls ?? []), { url: '', delay: 0, type: formData.type }],
         });
     };
 
@@ -280,6 +280,22 @@ export function ChannelForm({
                 <div className="space-y-2">
                     {(formData.base_urls ?? []).map((u, idx) => (
                         <div key={`baseurl-${idx}`} className="flex items-center gap-2">
+                            <Select
+                                value={String(u.type ?? formData.type)}
+                                onValueChange={(value) => handleUpdateBaseUrl(idx, { type: Number(value) as ChannelType })}
+                            >
+                                <SelectTrigger className="rounded-xl w-44 shrink-0 border border-border px-4 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className='rounded-xl'>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.OpenAIChat)}>{t('typeOpenAIChat')}</SelectItem>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.OpenAIResponse)}>{t('typeOpenAIResponse')}</SelectItem>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.Anthropic)}>{t('typeAnthropic')}</SelectItem>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.Gemini)}>{t('typeGemini')}</SelectItem>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.Volcengine)}>{t('typeVolcengine')}</SelectItem>
+                                    <SelectItem className='rounded-xl' value={String(ChannelType.OpenAIEmbedding)}>{t('typeOpenAIEmbedding')}</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Input
                                 id={`${idPrefix}-base-${idx}`}
                                 type="url"

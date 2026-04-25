@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound, ArrowLeftRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -25,6 +25,15 @@ import {
 } from '@/components/ui/morphing-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/animate-ui/components/animate/tooltip';
 
+const relayFormatLabelMap: Record<string, string> = {
+    openai: 'OpenAI Chat',
+    'openai-response': 'OpenAI Responses',
+    'openai-embedding': 'OpenAI Embedding',
+    anthropic: 'Anthropic',
+    gemini: 'Gemini',
+    volcengine: 'Volcengine',
+};
+
 function formatTime(timestamp: number): string {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString('zh-CN', {
@@ -39,6 +48,18 @@ function formatTime(timestamp: number): string {
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatRelayFormat(format?: string): string | null {
+    if (!format) return null;
+    return relayFormatLabelMap[format] ?? format;
+}
+
+function formatRelayPath(inboundFormat?: string, outboundFormat?: string): string | null {
+    const inbound = formatRelayFormat(inboundFormat);
+    const outbound = formatRelayFormat(outboundFormat);
+    if (!inbound && !outbound) return null;
+    return `${inbound ?? '?'}->${outbound ?? '?'}`;
 }
 
 interface RetryBadgeWithTooltipProps {
@@ -96,6 +117,46 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
                 ))}
             </TooltipContent>
         </Tooltip >
+    );
+}
+
+function RelayRouteBadge({ log }: { log: RelayLog }) {
+    const t = useTranslations('log.card');
+    const routeLabel = useMemo(
+        () => formatRelayPath(log.inbound_format, log.outbound_format),
+        [log.inbound_format, log.outbound_format]
+    );
+
+    if (!routeLabel) return null;
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span
+                    className={cn(
+                        "inline-flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors cursor-help",
+                        log.is_direct
+                            ? "border-sky-500/35 bg-sky-500/10 text-sky-500"
+                            : "border-border/70 bg-muted/50 text-muted-foreground"
+                    )}
+                >
+                    <ArrowLeftRight className="size-3" />
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="rounded-2xl border bg-card px-3 py-2 shadow-sm">
+                <div className="flex flex-col gap-1">
+                    <span className={cn(
+                        "text-[11px] font-medium",
+                        log.is_direct ? "text-sky-500" : "text-muted-foreground"
+                    )}>
+                        {log.is_direct ? t('transparentProxy') : t('protocolTransform')}
+                    </span>
+                    <span className="font-mono text-xs text-foreground">
+                        {routeLabel}
+                    </span>
+                </div>
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -228,6 +289,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                         {log.channel_name}
                                     </Badge>
                                 )}
+                                <RelayRouteBadge log={log} />
                                 <span className="text-muted-foreground truncate" title={log.actual_model_name}>
                                     {log.actual_model_name}
                                 </span>
@@ -302,6 +364,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     {log.channel_name}
                                 </Badge>
                             )}
+                            <RelayRouteBadge log={log} />
                             <span className="text-muted-foreground">{log.actual_model_name}</span>
                             {log.attempts?.some(a => a.sticky) && (
                                 <Pin className="size-3.5 shrink-0 text-amber-500" />

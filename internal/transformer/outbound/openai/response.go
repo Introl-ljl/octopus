@@ -438,6 +438,8 @@ type ResponsesStreamEvent struct {
 // Conversion functions
 
 func ConvertToResponsesRequest(req *model.InternalLLMRequest) *ResponsesRequest {
+	user, metadata := normalizeResponsesIdentity(req.User, req.Metadata)
+
 	result := &ResponsesRequest{
 		Model:             req.Model,
 		Temperature:       req.Temperature,
@@ -445,8 +447,8 @@ func ConvertToResponsesRequest(req *model.InternalLLMRequest) *ResponsesRequest 
 		Stream:            req.Stream,
 		Store:             req.Store,
 		ServiceTier:       req.ServiceTier,
-		User:              req.User,
-		Metadata:          req.Metadata,
+		User:              user,
+		Metadata:          metadata,
 		MaxOutputTokens:   req.MaxCompletionTokens,
 		ParallelToolCalls: req.ParallelToolCalls,
 	}
@@ -484,6 +486,38 @@ func ConvertToResponsesRequest(req *model.InternalLLMRequest) *ResponsesRequest 
 	}
 
 	return result
+}
+
+func normalizeResponsesIdentity(user *string, metadata map[string]string) (*string, map[string]string) {
+	if len(metadata) == 0 {
+		return user, nil
+	}
+
+	userID, hasUserID := metadata["user_id"]
+	if !hasUserID {
+		return user, metadata
+	}
+
+	if user == nil && userID != "" {
+		user = lo.ToPtr(userID)
+	}
+
+	if len(metadata) == 1 {
+		return user, nil
+	}
+
+	normalizedMetadata := make(map[string]string, len(metadata)-1)
+	for k, v := range metadata {
+		if k == "user_id" {
+			continue
+		}
+		normalizedMetadata[k] = v
+	}
+	if len(normalizedMetadata) == 0 {
+		return user, nil
+	}
+
+	return user, normalizedMetadata
 }
 
 func convertInstructionsFromMessages(msgs []model.Message) string {

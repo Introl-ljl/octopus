@@ -28,6 +28,8 @@ type RelayLog struct {
 	Time              int64            `json:"time"`                                     // 时间戳（秒）
 	RequestModelName  string           `json:"request_model_name"`                       // 请求模型名称
 	RequestAPIKeyName string           `json:"request_api_key_name"`                     // 请求使用的 API Key 名称
+	InboundFormat     string           `json:"inbound_format,omitempty"`                 // 入站协议格式
+	OutboundFormat    string           `json:"outbound_format,omitempty"`                // 出站协议格式
 	ChannelId         int              `json:"channel"`                                  // 实际使用的渠道ID
 	ChannelName       string           `json:"channel_name"`                             // 渠道名称
 	ActualModelName   string           `json:"actual_model_name"`                        // 实际使用模型名称
@@ -41,4 +43,5 @@ type RelayLog struct {
 	Error             string           `json:"error"`                                    // 错误信息
 	Attempts          []ChannelAttempt `json:"attempts" gorm:"serializer:json"`          // 所有尝试记录
 	TotalAttempts     int              `json:"total_attempts"`                           // 总尝试次数
+	IsDirect          bool             `json:"is_direct"`                                // 是否透明代理直连
 }

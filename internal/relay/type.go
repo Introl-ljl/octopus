@@ -8,7 +8,9 @@ import (
 	"github.com/bestruirui/octopus/internal/conf"
 	dbmodel "github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/relay/balancer"
+	"github.com/bestruirui/octopus/internal/transformer"
 	"github.com/bestruirui/octopus/internal/transformer/model"
+	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/gin-gonic/gin"
 )
 
@@ -55,8 +57,10 @@ var hopByHopHeaders = map[string]bool{
 
 type relayRequest struct {
 	c               *gin.Context
+	inFormat        transformer.Format // 入站协议格式
 	inAdapter       model.Inbound
 	internalRequest *model.InternalLLMRequest
+	rawBody         []byte // 原始请求体（用于透明代理）
 	metrics         *RelayMetrics
 	apiKeyID        int
 	requestModel    string
@@ -67,8 +71,11 @@ type relayRequest struct {
 type relayAttempt struct {
 	*relayRequest // 嵌入请求级上下文
 
+	outFormat            transformer.Format // 出站协议格式
 	outAdapter           model.Outbound
 	channel              *dbmodel.Channel
+	selectedBaseURL      string
+	selectedType         outbound.OutboundType
 	usedKey              dbmodel.ChannelKey
 	firstTokenTimeOutSec int
 }

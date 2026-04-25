@@ -32,3 +32,20 @@ func Get(inboundType InboundType) model.Inbound {
 	}
 	return nil
 }
+
+// InboundTypeToFormat 将 InboundType 转换为 Format 字符串。
+func InboundTypeToFormat(t InboundType) string {
+	switch t {
+	case InboundTypeOpenAIChat:
+		return "openai"
+	case InboundTypeOpenAIResponse:
+		return "openai-response"
+	case InboundTypeOpenAIEmbedding:
+		return "openai-embedding"
+	case InboundTypeAnthropic:
+		return "anthropic"
+	default:
+		return ""
+	}
+}
+
