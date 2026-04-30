@@ -84,7 +84,7 @@ export function Toolbar() {
     const searchExpanded = expandedSearchItem === toolbarItem;
 
     if (!toolbarItem) return null;
-    const showLayoutOptions = toolbarItem !== 'group';
+    const showLayoutOptions = true;
     const showCombinedSortOptions = toolbarItem === 'channel' || toolbarItem === 'group';
 
     const channelFilterLabelKeys: Record<ChannelFilter, string> = {
