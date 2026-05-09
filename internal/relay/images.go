@@ -302,6 +302,12 @@ func (m *imagesRelayMetrics) Save(ctx context.Context, success bool, err error, 
 	op.StatsAPIKeyUpdate(m.APIKeyID, globalStats)
 	op.StatsChannelUpdate(channelID, globalStats)
 
+	actualModel := m.ActualModel
+	if actualModel == "" {
+		actualModel = m.RequestModel
+	}
+	op.StatsModelUpdateByName(actualModel, channelID, globalStats)
+
 	log.Infof("images relay complete: model=%s, channel=%d(%s), success=%t, duration=%dms, input_token=%d, output_token=%d, input_cost=%f, output_cost=%f, total_cost=%f, attempts=%d",
 		m.RequestModel, channelID, channelName, success, duration.Milliseconds(),
 		m.Stats.InputToken, m.Stats.OutputToken,

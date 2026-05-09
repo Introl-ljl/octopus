@@ -138,6 +138,18 @@
             "sortByTokens": "Tokens",
             "noData": "No ranking data",
             "successRate": "Success Rate"
+        },
+        "pie": {
+            "title": "Distribution",
+            "modelCalls": "Model Calls",
+            "apiKeyUsage": "API Key Usage",
+            "metricType": {
+                "cost": "Cost",
+                "count": "Count",
+                "tokens": "Tokens"
+            },
+            "noModelData": "No model statistics",
+            "noAPIKeyData": "No API key statistics"
         }
     },
     "setting": {

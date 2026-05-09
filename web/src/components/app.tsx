@@ -100,6 +100,24 @@ export function AppContainer() {
                             );
                             prefetches.push(
                                 queryClient.prefetchQuery({
+                                    queryKey: ['stats', 'model'],
+                                    queryFn: async () => apiClient.get('/api/v1/stats/model'),
+                                })
+                            );
+                            prefetches.push(
+                                queryClient.prefetchQuery({
+                                    queryKey: ['stats', 'apikey'],
+                                    queryFn: async () => apiClient.get('/api/v1/stats/apikey'),
+                                })
+                            );
+                            prefetches.push(
+                                queryClient.prefetchQuery({
+                                    queryKey: ['apikeys', 'list'],
+                                    queryFn: async () => apiClient.get('/api/v1/apikey/list'),
+                                })
+                            );
+                            prefetches.push(
+                                queryClient.prefetchQuery({
                                     queryKey: ['channels', 'list'],
                                     queryFn: async () => apiClient.get('/api/v1/channel/list'),
                                 })

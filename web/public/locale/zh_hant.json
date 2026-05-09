@@ -138,6 +138,18 @@
             "sortByTokens": "Tokens",
             "noData": "暫無排行數據",
             "successRate": "成功率"
+        },
+        "pie": {
+            "title": "分佈",
+            "modelCalls": "模型調用",
+            "apiKeyUsage": "API Key 用量",
+            "metricType": {
+                "cost": "金額",
+                "count": "次數",
+                "tokens": "Tokens"
+            },
+            "noModelData": "暫無模型統計數據",
+            "noAPIKeyData": "暫無 API Key 統計數據"
         }
     },
     "setting": {

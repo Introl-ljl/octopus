@@ -4,6 +4,7 @@ import { Activity } from './activity';
 import { Total } from './total';
 import { StatsChart } from './chart';
 import { Rank } from './rank';
+import { StatsPieCharts } from './pie-charts';
 import { PageWrapper } from '@/components/common/PageWrapper';
 
 export function Home() {
@@ -12,6 +13,7 @@ export function Home() {
             <Total />
             <Activity />
             <StatsChart />
+            <StatsPieCharts />
             <Rank />
         </PageWrapper>
     );
