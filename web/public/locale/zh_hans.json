@@ -194,7 +194,16 @@
                 "label": "最大冷却时间（秒）",
                 "placeholder": "请输入最大冷却时间"
             },
-            "hint": "当渠道连续失败达到阈值后触发熔断，冷却时间按指数退避增长，上限为最大冷却时间"
+            "hint": "当渠道连续失败达到阈值后触发熔断，冷却时间按指数退避增长，上限为最大冷却时间",
+            "reset": {
+                "label": "重置熔断器",
+                "button": "重置所有",
+                "resetting": "重置中...",
+                "cancel": "取消",
+                "confirm": "确定要重置所有熔断器吗？",
+                "success": "所有熔断器已重置",
+                "error": "重置熔断器失败"
+            }
         },
         "saved": "已保存",
         "backup": {
@@ -467,6 +476,9 @@
         "card": {
             "requestCount": "请求次数",
             "totalCost": "总成本",
+            "usage": "用量",
+            "usageLoading": "正在获取用量...",
+            "usageFailed": "用量获取失败",
             "toast": {
                 "enabled": "渠道已启用",
                 "disabled": "渠道已禁用"
@@ -481,6 +493,7 @@
                 "requests": "请求详情",
                 "tokens": "Token 使用",
                 "costs": "成本详情",
+                "usage": "用量信息",
                 "baseUrls": "Base URLs",
                 "keys": "密钥"
             },
@@ -506,6 +519,10 @@
                 "delete": "删除",
                 "confirmDelete": "确认删除",
                 "deleting": "删除中..."
+            },
+            "usage": {
+                "loading": "正在获取用量...",
+                "failed": "用量获取失败"
             }
         },
         "create": {
@@ -530,6 +547,9 @@
             "channelProxyPlaceholder": "可选：仅对该渠道生效（覆盖全局代理）",
             "paramOverride": "参数覆盖",
             "paramOverridePlaceholder": "可选：JSON 字符串，用于覆盖请求参数",
+            "usageConfig": "用量卡片配置",
+            "usageConfigPlaceholder": "可选：JSON 配置。支持 {{key}}、{{api_key}}、{{base_url}}、{{channel_name}} 占位符。\n示例：{\n  \"enabled\": true,\n  \"title\": \"DeepSeek 余额\",\n  \"url\": \"https://api.deepseek.com/user/balance\",\n  \"method\": \"GET\",\n  \"headers\": [{\"header_key\": \"Authorization\", \"header_value\": \"Bearer {{key}}\"}],\n  \"items\": [{\"label\": \"余额\", \"path\": \"balance_infos.0.total_balance\", \"unit\": \"USD\"}]\n}",
+            "usageConfigHelp": "通过 gjson 路径从响应 JSON 中提取字段，适配 Coding Plan、Codex、DeepSeek 等不同供应商。",
             "model": "模型",
             "enabled": "启用",
             "proxy": "使用代理",

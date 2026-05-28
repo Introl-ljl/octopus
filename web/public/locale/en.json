@@ -194,7 +194,16 @@
                 "label": "Max Cooldown (seconds)",
                 "placeholder": "Enter max cooldown in seconds"
             },
-            "hint": "When a channel fails consecutively up to the threshold, circuit breaker trips. Cooldown grows exponentially up to the max cooldown"
+            "hint": "When a channel fails consecutively up to the threshold, circuit breaker trips. Cooldown grows exponentially up to the max cooldown",
+            "reset": {
+                "label": "Reset Circuit Breakers",
+                "button": "Reset All",
+                "resetting": "Resetting...",
+                "cancel": "Cancel",
+                "confirm": "Are you sure you want to reset all circuit breakers?",
+                "success": "All circuit breakers have been reset",
+                "error": "Failed to reset circuit breakers"
+            }
         },
         "saved": "Saved",
         "backup": {
@@ -467,6 +476,9 @@
         "card": {
             "requestCount": "Requests",
             "totalCost": "Total Cost",
+            "usage": "Usage",
+            "usageLoading": "Loading usage...",
+            "usageFailed": "Failed to load usage",
             "toast": {
                 "enabled": "Channel enabled",
                 "disabled": "Channel disabled"
@@ -481,6 +493,7 @@
                 "requests": "Request Details",
                 "tokens": "Token Usage",
                 "costs": "Cost Details",
+                "usage": "Usage Info",
                 "baseUrls": "Base URLs",
                 "keys": "Keys"
             },
@@ -506,6 +519,10 @@
                 "delete": "Delete",
                 "confirmDelete": "Confirm Delete",
                 "deleting": "Deleting..."
+            },
+            "usage": {
+                "loading": "Loading usage...",
+                "failed": "Failed to load usage"
             }
         },
         "create": {
@@ -530,6 +547,9 @@
             "channelProxyPlaceholder": "Optional: proxy for this channel (overrides global proxy)",
             "paramOverride": "Param Override",
             "paramOverridePlaceholder": "Optional: JSON string to override request params",
+            "usageConfig": "Usage Card Config",
+            "usageConfigPlaceholder": "Optional JSON config. Supports {{key}}, {{api_key}}, {{base_url}}, {{channel_name}} placeholders.\nExample: {\n  \"enabled\": true,\n  \"title\": \"DeepSeek Balance\",\n  \"url\": \"https://api.deepseek.com/user/balance\",\n  \"method\": \"GET\",\n  \"headers\": [{\"header_key\": \"Authorization\", \"header_value\": \"Bearer {{key}}\"}],\n  \"items\": [{\"label\": \"Balance\", \"path\": \"balance_infos.0.total_balance\", \"unit\": \"USD\"}]\n}",
+            "usageConfigHelp": "Extract fields from response JSON with gjson paths to support Coding Plan, Codex, DeepSeek and other providers.",
             "model": "Model",
             "enabled": "Enabled",
             "proxy": "Use Proxy",

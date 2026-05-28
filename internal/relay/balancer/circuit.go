@@ -141,6 +141,23 @@ func RecordSuccess(channelID, keyID int, modelName string) {
 	entry.TripCount = 0
 }
 
+// ResetAll 重置所有熔断器，恢复为正常通行状态
+func ResetAll() int {
+	count := 0
+	globalBreaker.Range(func(key, value interface{}) bool {
+		entry := value.(*circuitEntry)
+		entry.mu.Lock()
+		entry.State = StateClosed
+		entry.ConsecutiveFailures = 0
+		entry.LastFailureTime = time.Time{}
+		entry.TripCount = 0
+		entry.mu.Unlock()
+		count++
+		return true
+	})
+	return count
+}
+
 // RecordFailure 记录失败，可能触发熔断
 func RecordFailure(channelID, keyID int, modelName string) {
 	key := circuitKey(channelID, keyID, modelName)

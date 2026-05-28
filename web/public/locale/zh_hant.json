@@ -194,7 +194,16 @@
                 "label": "最大冷卻時間（秒）",
                 "placeholder": "請輸入最大冷卻時間"
             },
-            "hint": "當渠道連續失敗達到閾值後觸發熔斷，冷卻時間按指數退避增長，上限為最大冷卻時間"
+            "hint": "當渠道連續失敗達到閾值後觸發熔斷，冷卻時間按指數退避增長，上限為最大冷卻時間",
+            "reset": {
+                "label": "重置熔斷器",
+                "button": "重置所有",
+                "resetting": "重置中...",
+                "cancel": "取消",
+                "confirm": "確定要重置所有熔斷器嗎？",
+                "success": "所有熔斷器已重置",
+                "error": "重置熔斷器失敗"
+            }
         },
         "saved": "已儲存",
         "backup": {
@@ -467,6 +476,9 @@
         "card": {
             "requestCount": "請求次數",
             "totalCost": "總成本",
+            "usage": "用量",
+            "usageLoading": "正在獲取用量...",
+            "usageFailed": "用量獲取失敗",
             "toast": {
                 "enabled": "供應源已啟用",
                 "disabled": "供應源已停用"
@@ -481,6 +493,7 @@
                 "requests": "請求詳情",
                 "tokens": "Token 使用",
                 "costs": "成本詳情",
+                "usage": "用量資訊",
                 "baseUrls": "Base URLs",
                 "keys": "金鑰"
             },
@@ -506,6 +519,10 @@
                 "delete": "刪除",
                 "confirmDelete": "確認刪除",
                 "deleting": "刪除中..."
+            },
+            "usage": {
+                "loading": "正在獲取用量...",
+                "failed": "用量獲取失敗"
             }
         },
         "create": {
@@ -530,6 +547,9 @@
             "channelProxyPlaceholder": "可選：僅對該供應源生效（覆蓋全域代理）",
             "paramOverride": "參數覆蓋",
             "paramOverridePlaceholder": "可選：JSON 字串，用於覆蓋請求參數",
+            "usageConfig": "用量卡片設定",
+            "usageConfigPlaceholder": "可選：JSON 設定。支援 {{key}}、{{api_key}}、{{base_url}}、{{channel_name}} 佔位符。\n範例：{\n  \"enabled\": true,\n  \"title\": \"DeepSeek 餘額\",\n  \"url\": \"https://api.deepseek.com/user/balance\",\n  \"method\": \"GET\",\n  \"headers\": [{\"header_key\": \"Authorization\", \"header_value\": \"Bearer {{key}}\"}],\n  \"items\": [{\"label\": \"餘額\", \"path\": \"balance_infos.0.total_balance\", \"unit\": \"USD\"}]\n}",
+            "usageConfigHelp": "透過 gjson 路徑從回應 JSON 中擷取欄位，適配 Coding Plan、Codex、DeepSeek 等不同供應商。",
             "model": "模型",
             "enabled": "啟用",
             "proxy": "使用代理",

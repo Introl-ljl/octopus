@@ -75,6 +75,25 @@ export function useSetSetting() {
 }
 
 /**
+ * 重置熔断器 Hook
+ */
+export function useResetCircuitBreaker() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async () => {
+            return apiClient.post<{ reset_count: number }>('/api/v1/setting/circuit-breaker/reset');
+        },
+        onSuccess: (data) => {
+            logger.log('Circuit breaker reset successful:', data);
+        },
+        onError: (error) => {
+            logger.error('Circuit breaker reset failed:', error);
+        },
+    });
+}
+
+/**
  * 数据库导入/导出
  */
 export interface DBImportResult {

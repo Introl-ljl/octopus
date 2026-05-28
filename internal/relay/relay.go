@@ -17,6 +17,7 @@ import (
 	dbmodel "github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/relay/balancer"
+	"github.com/bestruirui/octopus/internal/relay/plugin"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/transformer"
 	"github.com/bestruirui/octopus/internal/transformer/model"
@@ -63,6 +64,10 @@ func Handler(inFormat transformer.Format, c *gin.Context) {
 	internalRequest, rawBody, inAdapter, err := parseRequest(inFormat, c)
 	if err != nil {
 		return
+	}
+	ctx := c.Request.Context()
+	if err := plugin.RunOnRequest(ctx, internalRequest); err != nil {
+		log.Warnf("plugin OnRequest failed: %v", err)
 	}
 	supportedModels := c.GetString("supported_models")
 	if supportedModels != "" {
@@ -191,6 +196,11 @@ func Handler(inFormat transformer.Format, c *gin.Context) {
 
 		result := ra.attempt()
 		if result.Success {
+			if ra.metrics.InternalResponse != nil {
+				if err := plugin.RunOnResponse(ctx, internalRequest, ra.metrics.InternalResponse); err != nil {
+					log.Warnf("plugin OnResponse failed: %v", err)
+				}
+			}
 			metrics.Save(c.Request.Context(), true, nil, iter.Attempts())
 			return
 		}
@@ -351,6 +361,16 @@ func (ra *relayAttempt) forward() (int, error) {
 		}
 		outboundRequest.Body = io.NopCloser(bytes.NewBuffer(modifiedBody))
 		outboundRequest.ContentLength = int64(len(modifiedBody))
+	}
+
+	// 插件：注入 reasoning_content
+	if body, err := io.ReadAll(outboundRequest.Body); err == nil {
+		if modified, err := plugin.RunPrepareRequestBody(ctx, ra.internalRequest, body); err == nil && len(modified) > 0 {
+			outboundRequest.Body = io.NopCloser(bytes.NewBuffer(modified))
+			outboundRequest.ContentLength = int64(len(modified))
+		} else {
+			outboundRequest.Body = io.NopCloser(bytes.NewBuffer(body))
+		}
 	}
 
 	// 复制请求头
@@ -584,6 +604,16 @@ func (ra *relayAttempt) forwardTransparent(ctx context.Context) (int, error) {
 		outboundRequest.Header.Set("Authorization", "Bearer "+ra.usedKey.ChannelKey)
 	}
 	outboundRequest.Header.Set("Content-Type", "application/json")
+
+	// 插件：注入 reasoning_content
+	if body, err := io.ReadAll(outboundRequest.Body); err == nil {
+		if modified, err := plugin.RunPrepareRequestBody(ctx, ra.internalRequest, body); err == nil && len(modified) > 0 {
+			outboundRequest.Body = io.NopCloser(bytes.NewBuffer(modified))
+			outboundRequest.ContentLength = int64(len(modified))
+		} else {
+			outboundRequest.Body = io.NopCloser(bytes.NewBuffer(body))
+		}
+	}
 
 	ra.copyHeaders(outboundRequest)
 

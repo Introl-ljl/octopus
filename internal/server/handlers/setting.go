@@ -10,6 +10,7 @@ import (
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
+	"github.com/bestruirui/octopus/internal/relay/balancer"
 	"github.com/bestruirui/octopus/internal/server/middleware"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
@@ -36,6 +37,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/import", http.MethodPost).
 				Handle(importDB),
+		).
+		AddRoute(
+			router.NewRoute("/circuit-breaker/reset", http.MethodPost).
+				Handle(resetCircuitBreaker),
 		)
 }
 
@@ -79,6 +84,11 @@ func setSetting(c *gin.Context) {
 		task.Update(string(setting.Key), time.Duration(hours)*time.Hour)
 	}
 	resp.Success(c, setting)
+}
+
+func resetCircuitBreaker(c *gin.Context) {
+	count := balancer.ResetAll()
+	resp.Success(c, gin.H{"reset_count": count})
 }
 
 func exportDB(c *gin.Context) {

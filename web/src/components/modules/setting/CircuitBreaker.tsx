@@ -2,9 +2,21 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Zap, Hash, Timer, TimerOff, HelpCircle } from 'lucide-react';
+import { Zap, Hash, Timer, TimerOff, RefreshCw, HelpCircle, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useSettingList, useSetSetting, SettingKey } from '@/api/endpoints/setting';
+import { Button } from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogTrigger,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogAction,
+    AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { useSettingList, useSetSetting, useResetCircuitBreaker, SettingKey } from '@/api/endpoints/setting';
 import { toast } from '@/components/common/Toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
 
@@ -12,6 +24,7 @@ export function SettingCircuitBreaker() {
     const t = useTranslations('setting');
     const { data: settings } = useSettingList();
     const setSetting = useSetSetting();
+    const resetCircuitBreaker = useResetCircuitBreaker();
 
     const [threshold, setThreshold] = useState('');
     const [cooldown, setCooldown] = useState('');
@@ -54,6 +67,20 @@ export function SettingCircuitBreaker() {
                 } else if (key === SettingKey.CircuitBreakerMaxCooldown) {
                     initialMaxCooldown.current = value;
                 }
+            }
+        });
+    };
+
+    const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+
+    const handleResetConfirm = () => {
+        setIsResetDialogOpen(false);
+        resetCircuitBreaker.mutate(undefined, {
+            onSuccess: () => {
+                toast.success(t('circuitBreaker.reset.success'));
+            },
+            onError: () => {
+                toast.error(t('circuitBreaker.reset.error'));
             }
         });
     };
@@ -121,6 +148,58 @@ export function SettingCircuitBreaker() {
                     placeholder={t('circuitBreaker.maxCooldown.placeholder')}
                     className="w-48 rounded-xl"
                 />
+            </div>
+
+            {/* 重置熔断器 */}
+            <div className="flex items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-3">
+                    <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm font-medium">{t('circuitBreaker.reset.label')}</span>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <HelpCircle className="size-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {t('circuitBreaker.reset.hint')}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+                <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={resetCircuitBreaker.isPending}
+                            className="rounded-xl"
+                        >
+                            <RefreshCw className={`size-4 ${resetCircuitBreaker.isPending ? 'animate-spin' : ''}`} />
+                            {resetCircuitBreaker.isPending ? t('circuitBreaker.reset.resetting') : t('circuitBreaker.reset.button')}
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-3xl">
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                                    <AlertTriangle className="size-5 text-destructive" />
+                                </div>
+                                <div>
+                                    <AlertDialogTitle>{t('circuitBreaker.reset.label')}</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        {t('circuitBreaker.reset.confirm')}
+                                    </AlertDialogDescription>
+                                </div>
+                            </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel className="rounded-xl">{t('circuitBreaker.reset.cancel')}</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleResetConfirm} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                {t('circuitBreaker.reset.button')}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );
