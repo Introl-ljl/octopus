@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -68,7 +69,7 @@ func (s *reasoningStore) Cleanup(maxAge time.Duration) {
 }
 
 type DeepSeekThinkingPlugin struct {
-	store    *reasoningStore
+	store       *reasoningStore
 	cleanupOnce sync.Once
 }
 
@@ -99,6 +100,9 @@ func (p *DeepSeekThinkingPlugin) OnResponse(ctx context.Context, req *tmodel.Int
 	if actualModel == "" {
 		actualModel = req.Model
 	}
+	if !isDeepSeekModel(actualModel) {
+		return nil
+	}
 
 	for _, choice := range resp.Choices {
 		msg := choice.Message
@@ -114,7 +118,7 @@ func (p *DeepSeekThinkingPlugin) OnResponse(ctx context.Context, req *tmodel.Int
 			continue
 		}
 
-		key := messageKey(actualModel, msg)
+		key := messageKey(req.ReasoningCacheScope, conversationPrefixKey(req.Messages), actualModel, msg)
 		p.store.Set(key, rc)
 	}
 
@@ -123,6 +127,9 @@ func (p *DeepSeekThinkingPlugin) OnResponse(ctx context.Context, req *tmodel.Int
 
 func (p *DeepSeekThinkingPlugin) PrepareRequestBody(ctx context.Context, req *tmodel.InternalLLMRequest, body []byte) ([]byte, error) {
 	if !p.enabled() || !gjson.ValidBytes(body) {
+		return body, nil
+	}
+	if !isDeepSeekModel(req.Model) {
 		return body, nil
 	}
 
@@ -137,8 +144,12 @@ func (p *DeepSeekThinkingPlugin) PrepareRequestBody(ctx context.Context, req *tm
 	var modified bool
 
 	messages.ForEach(func(key, msg gjson.Result) bool {
+		messageIndex := int(key.Int())
 		role := msg.Get("role").String()
 		if role != "assistant" {
+			return true
+		}
+		if messageIndex >= len(req.Messages) {
 			return true
 		}
 
@@ -152,7 +163,12 @@ func (p *DeepSeekThinkingPlugin) PrepareRequestBody(ctx context.Context, req *tm
 			return true
 		}
 
-		storeKey := messageKeyFromContent(req.Model, content)
+		storeKey := messageKeyFromContent(
+			req.ReasoningCacheScope,
+			conversationPrefixKey(req.Messages[:messageIndex]),
+			req.Model,
+			content,
+		)
 		saved, ok := p.store.Get(storeKey)
 		if !ok {
 			return true
@@ -190,8 +206,12 @@ func (p *DeepSeekThinkingPlugin) startCleanup() {
 	})
 }
 
-func messageKey(model string, msg *tmodel.Message) string {
+func messageKey(scope, prefixKey, model string, msg *tmodel.Message) string {
 	h := sha256.New()
+	h.Write([]byte(scope))
+	h.Write([]byte{0})
+	h.Write([]byte(prefixKey))
+	h.Write([]byte{0})
 	h.Write([]byte(model))
 	h.Write([]byte{0})
 	if msg.Content.Content != nil {
@@ -210,10 +230,61 @@ func messageKey(model string, msg *tmodel.Message) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func messageKeyFromContent(model string, content string) string {
+func messageKeyFromContent(scope, prefixKey, model string, content string) string {
 	h := sha256.New()
+	h.Write([]byte(scope))
+	h.Write([]byte{0})
+	h.Write([]byte(prefixKey))
+	h.Write([]byte{0})
 	h.Write([]byte(model))
 	h.Write([]byte{0})
 	h.Write([]byte(content))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func conversationPrefixKey(messages []tmodel.Message) string {
+	h := sha256.New()
+	for _, msg := range messages {
+		h.Write([]byte(msg.Role))
+		h.Write([]byte{0})
+		if msg.Content.Content != nil {
+			h.Write([]byte(*msg.Content.Content))
+		}
+		for _, mc := range msg.Content.MultipleContent {
+			h.Write([]byte(mc.Type))
+			h.Write([]byte{0})
+			if mc.Text != nil {
+				h.Write([]byte(*mc.Text))
+			}
+			if mc.ImageURL != nil {
+				h.Write([]byte(mc.ImageURL.URL))
+			}
+			if mc.Audio != nil {
+				h.Write([]byte(mc.Audio.Format))
+				h.Write([]byte(mc.Audio.Data))
+			}
+			if mc.File != nil {
+				h.Write([]byte(mc.File.Filename))
+				h.Write([]byte(mc.File.FileData))
+			}
+			h.Write([]byte{0})
+		}
+		if msg.Name != nil {
+			h.Write([]byte(*msg.Name))
+		}
+		if msg.ToolCallID != nil {
+			h.Write([]byte(*msg.ToolCallID))
+		}
+		for _, tc := range msg.ToolCalls {
+			h.Write([]byte(tc.ID))
+			h.Write([]byte(tc.Function.Name))
+			h.Write([]byte(tc.Function.Arguments))
+		}
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func isDeepSeekModel(model string) bool {
+	return strings.Contains(strings.ToLower(model), "deepseek")
 }

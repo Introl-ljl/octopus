@@ -197,6 +197,7 @@
             "hint": "When a channel fails consecutively up to the threshold, circuit breaker trips. Cooldown grows exponentially up to the max cooldown",
             "reset": {
                 "label": "Reset Circuit Breakers",
+                "hint": "Clear all current circuit breaker cooldowns and failure counters",
                 "button": "Reset All",
                 "resetting": "Resetting...",
                 "cancel": "Cancel",

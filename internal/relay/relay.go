@@ -66,6 +66,9 @@ func Handler(inFormat transformer.Format, c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
+	apiKeyID := c.GetInt("api_key_id")
+	internalRequest.ReasoningCacheScope = fmt.Sprintf("api_key:%d", apiKeyID)
+
 	if err := plugin.RunOnRequest(ctx, internalRequest); err != nil {
 		log.Warnf("plugin OnRequest failed: %v", err)
 	}
@@ -79,7 +82,6 @@ func Handler(inFormat transformer.Format, c *gin.Context) {
 	}
 
 	requestModel := internalRequest.Model
-	apiKeyID := c.GetInt("api_key_id")
 
 	// 获取通道分组
 	group, err := op.GroupGetEnabledMap(requestModel, c.Request.Context())

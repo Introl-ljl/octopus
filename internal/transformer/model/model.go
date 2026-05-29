@@ -254,6 +254,10 @@ type InternalLLMRequest struct {
 	// Query stores the original query parameters from the inbound request.
 	// This is a help field and will not be sent to the llm service.
 	Query url.Values `json:"-"`
+
+	// ReasoningCacheScope scopes relay-local reasoning_content recovery.
+	// This is a help field and will not be sent to the llm service.
+	ReasoningCacheScope string `json:"-"`
 }
 
 func (r *InternalLLMRequest) Validate() error {
@@ -328,7 +332,6 @@ func (r *InternalLLMRequest) fillMissingToolCallIDs() {
 		}
 	}
 }
-
 
 func (r *InternalLLMRequest) fillMissingToolCallIDsFromToolMessages() {
 	for msgIndex := 0; msgIndex < len(r.Messages); msgIndex++ {
