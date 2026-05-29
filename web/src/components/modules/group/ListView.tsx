@@ -242,6 +242,7 @@ function GroupListRow({ group }: { group: Group }) {
     );
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!isDragging.current) setMembers([...displayMembers]);
     }, [displayMembers]);
 
@@ -250,7 +251,8 @@ function GroupListRow({ group }: { group: Group }) {
     }, [members]);
 
     useEffect(() => {
-        return () => { if (weightTimerRef.current) clearTimeout(weightTimerRef.current); };
+        const timer = weightTimerRef.current;
+        return () => { if (timer) clearTimeout(timer); };
     }, []);
 
     const isUpdatingMode = (() => {
@@ -259,14 +261,6 @@ function GroupListRow({ group }: { group: Group }) {
         if (typeof v !== 'object' || v === null) return false;
         return 'mode' in v && typeof (v as { mode?: unknown }).mode === 'number';
     })();
-
-    const priorityByItemId = useMemo(() => {
-        const map = new Map<number, number>();
-        (group.items || []).forEach((item) => {
-            if (item.id !== undefined) map.set(item.id, item.priority);
-        });
-        return map;
-    }, [group.items]);
 
     const memberCount = group.items?.length ?? 0;
 

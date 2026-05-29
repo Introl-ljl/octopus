@@ -206,6 +206,13 @@
                 "error": "Failed to reset circuit breakers"
             }
         },
+        "plugin": {
+            "title": "Plugins",
+            "thinking": {
+                "label": "DeepSeek Thinking Recovery",
+                "hint": "When DeepSeek responses include reasoning content, cache it locally and restore it on the next matching DeepSeek request"
+            }
+        },
         "saved": "Saved",
         "backup": {
             "title": "Backup / Restore",

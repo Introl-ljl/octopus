@@ -105,6 +105,7 @@ export function GroupCard({ group }: { group: Group }) {
     );
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!isDragging.current) setMembers([...displayMembers]);
     }, [displayMembers]);
 

@@ -22,6 +22,7 @@ export const SettingKey = {
     CircuitBreakerThreshold: 'circuit_breaker_threshold',
     CircuitBreakerCooldown: 'circuit_breaker_cooldown',
     CircuitBreakerMaxCooldown: 'circuit_breaker_max_cooldown',
+    EnableThinkingPlugin: 'enable_thinking_plugin',
 } as const;
 
 /**
@@ -78,8 +79,6 @@ export function useSetSetting() {
  * 重置熔断器 Hook
  */
 export function useResetCircuitBreaker() {
-    const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: async () => {
             return apiClient.post<{ reset_count: number }>('/api/v1/setting/circuit-breaker/reset');
@@ -228,4 +227,3 @@ export function useImportDB() {
         },
     });
 }
-

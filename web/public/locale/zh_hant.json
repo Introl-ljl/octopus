@@ -206,6 +206,13 @@
                 "error": "重置熔斷器失敗"
             }
         },
+        "plugin": {
+            "title": "插件",
+            "thinking": {
+                "label": "DeepSeek 思考內容回填",
+                "hint": "當 DeepSeek 回應包含 reasoning_content 時，在本機快取並在下一次匹配的 DeepSeek 請求中回填"
+            }
+        },
         "saved": "已儲存",
         "backup": {
             "title": "備份 / 復原",
