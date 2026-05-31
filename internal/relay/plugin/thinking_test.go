@@ -54,8 +54,8 @@ func TestThinkingCacheIsScopedByCallerAndConversation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareRequestBody returned error: %v", err)
 	}
-	if strings.Contains(string(modified), "reasoning_content") {
-		t.Fatalf("reasoning_content leaked across caller scope: %s", string(modified))
+	if !strings.Contains(string(modified), `"reasoning_content":"the visible answer"`) {
+		t.Fatalf("expected content fallback for other caller scope, got: %s", string(modified))
 	}
 
 	otherConversationContent := "different prior user message"
@@ -72,8 +72,8 @@ func TestThinkingCacheIsScopedByCallerAndConversation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareRequestBody returned error for other conversation: %v", err)
 	}
-	if strings.Contains(string(modified), "reasoning_content") {
-		t.Fatalf("reasoning_content leaked across conversation scope: %s", string(modified))
+	if !strings.Contains(string(modified), `"reasoning_content":"the visible answer"`) {
+		t.Fatalf("expected content fallback for other conversation, got: %s", string(modified))
 	}
 
 	sameConversationReq := &tmodel.InternalLLMRequest{
@@ -90,6 +90,34 @@ func TestThinkingCacheIsScopedByCallerAndConversation(t *testing.T) {
 	}
 	if !strings.Contains(string(modified), `"reasoning_content":"private reasoning"`) {
 		t.Fatalf("expected reasoning_content injection for same scope and conversation, got: %s", string(modified))
+	}
+}
+
+func TestThinkingFallbackUsesContentWhenCacheMisses(t *testing.T) {
+	p := &DeepSeekThinkingPlugin{
+		store: &reasoningStore{
+			data: make(map[string]*reasoningEntry),
+		},
+	}
+
+	userContent := "run memory search"
+	assistantContent := "Searching memory for relevant context..."
+	body := []byte(`{"messages":[{"role":"user","content":"run memory search"},{"role":"assistant","content":"Searching memory for relevant context...","tool_calls":[{"id":"call_1","type":"function","function":{"name":"memory_search","arguments":"{}"}}]}]}`)
+	req := &tmodel.InternalLLMRequest{
+		Model:               "deepseek-reasoner",
+		ReasoningCacheScope: "api_key:1",
+		Messages: []tmodel.Message{
+			{Role: "user", Content: tmodel.MessageContent{Content: &userContent}},
+			{Role: "assistant", Content: tmodel.MessageContent{Content: &assistantContent}},
+		},
+	}
+
+	modified, err := p.PrepareRequestBody(context.Background(), req, body)
+	if err != nil {
+		t.Fatalf("PrepareRequestBody returned error: %v", err)
+	}
+	if !strings.Contains(string(modified), `"reasoning_content":"Searching memory for relevant context..."`) {
+		t.Fatalf("expected content fallback reasoning_content, got: %s", string(modified))
 	}
 }
 

@@ -373,6 +373,43 @@ Edit `~/.codex/auth.json`
 
 ---
 
+## 💻 CLI Remote Management
+
+Octopus includes a built-in CLI for remote server management via API:
+
+```bash
+# Configure a connection profile
+octopus remote profile add my-server --server http://127.0.0.1:8080
+octopus remote profile list
+
+# Authenticate
+octopus remote login --username admin
+octopus remote status
+
+# Manage resources
+octopus remote channel list
+octopus remote group list --output json
+octopus remote apikey list
+octopus remote model list
+octopus remote setting list
+octopus remote stats total
+octopus remote log list --page-size 20
+
+# Run destructive commands with confirmation or --force
+octopus remote log clear --force
+
+# All commands support --output json for automation
+octopus remote channel list --output json
+
+# Use --help for full command documentation
+octopus remote --help
+octopus remote channel --help
+```
+
+> 💡 **Tip**: The CLI stores profiles and session tokens locally in `~/.octopus/config.yaml`. Secrets are redacted in human-readable output by default.
+
+---
+
 ## 🤝 Acknowledgments
 
 - 🙏 [looplj/axonhub](https://github.com/looplj/axonhub) - The LLM API adaptation module in this project is directly derived from this repository

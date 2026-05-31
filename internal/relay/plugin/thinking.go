@@ -141,7 +141,7 @@ func (p *DeepSeekThinkingPlugin) PrepareRequestBody(ctx context.Context, req *tm
 	}
 
 	result := body
-	var modified bool
+	injected := 0
 
 	messages.ForEach(func(key, msg gjson.Result) bool {
 		messageIndex := int(key.Int())
@@ -169,26 +169,25 @@ func (p *DeepSeekThinkingPlugin) PrepareRequestBody(ctx context.Context, req *tm
 			req.Model,
 			content,
 		)
-		saved, ok := p.store.Get(storeKey)
-		if !ok {
-			return true
+		reasoningContent := content
+		if saved, ok := p.store.Get(storeKey); ok {
+			reasoningContent = saved
+			p.store.Delete(storeKey)
 		}
 
 		msgPath := fmt.Sprintf("messages.%d.reasoning_content", key.Int())
 		var err error
-		result, err = sjson.SetBytes(result, msgPath, saved)
+		result, err = sjson.SetBytes(result, msgPath, reasoningContent)
 		if err != nil {
 			log.Warnf("plugin thinking: failed to inject reasoning_content: %v", err)
 			return true
 		}
-		modified = true
-
-		p.store.Delete(storeKey)
+		injected++
 		return true
 	})
 
-	if modified {
-		log.Infof("plugin thinking: injected reasoning_content into %d assistant message(s)", 1)
+	if injected > 0 {
+		log.Infof("plugin thinking: injected reasoning_content into %d assistant message(s)", injected)
 	}
 
 	return result, nil

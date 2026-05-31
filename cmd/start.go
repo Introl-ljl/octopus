@@ -54,5 +54,5 @@ var startCmd = &cobra.Command{
 
 func init() {
 	startCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./data/config.json)")
-	rootCmd.AddCommand(startCmd)
+	RootCmd.AddCommand(startCmd)
 }

@@ -4,3 +4,16 @@ static/out/*
 !static/out/README.md
 .vscode
 .ace-tool/
+## go
+*.exe
+*.test
+*.out
+vendor/
+coverage/
+tmp/
+
+# local dev config
+.opencode/
+.specify/
+AGENTS.md
+octopus
